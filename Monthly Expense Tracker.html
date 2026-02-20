@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Projection Finance Tracker</title>
+    <style>
+        :root { --primary: #1a237e; --bg: #f0f4f8; --card: #ffffff; --accent: #00c853; --danger: #ff5252; --annual: #673ab7; }
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg); margin: 0; padding: 20px; color: #333; }
+        .container { max-width: 700px; margin: auto; background: var(--card); padding: 30px; border-radius: 20px; box-shadow: 0 15px 35px rgba(0,0,0,0.1); }
+        h1 { text-align: center; color: var(--primary); margin-bottom: 25px; }
+        
+        .selector-box { display: flex; gap: 10px; background: #e8eaf6; padding: 15px; border-radius: 12px; margin-bottom: 25px; }
+        
+        .input-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #edf2f7; }
+        .input-item:last-child { border-bottom: none; }
+        
+        label { font-size: 0.9rem; font-weight: 600; color: #4a5568; flex: 1; }
+        input, select { width: 180px; padding: 10px; border: 2px solid #e2e8f0; border-radius: 8px; font-size: 0.9rem; outline: none; }
+        
+        button { width: 100%; padding: 18px; border: none; border-radius: 12px; font-size: 1.1em; font-weight: bold; cursor: pointer; transition: 0.3s; background: var(--primary); color: white; margin-top: 25px; }
+        button:hover { opacity: 0.95; transform: translateY(-1px); }
+
+        .result-pane { display: none; margin-top: 25px; text-align: center; padding: 25px; border-radius: 15px; background: #f1f8e9; border: 2px solid var(--accent); }
+        .res-val { font-size: 2.5em; font-weight: 800; color: var(--primary); }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 40px; font-size: 0.85em; }
+        th { background: #f7fafc; padding: 12px; text-align: left; color: #718096; }
+        td { padding: 12px; border-bottom: 1px solid #edf2f7; }
+        
+        .tag { font-size: 0.7em; padding: 3px 8px; border-radius: 4px; font-weight: bold; color: white; margin-right: 5px; }
+        .tag-month { background: var(--accent); }
+        .tag-year { background: var(--annual); }
+        .del-btn { background: var(--danger); color: white; border: none; padding: 6px 12px; border-radius: 6px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>Financial Tracker</h1>
+
+    <div class="selector-box">
+        <select id="calcMode" onchange="toggleMode()">
+            <option value="monthly">Monthly Entry</option>
+            <option value="yearly">Yearly Projection (x12)</option>
+        </select>
+        <select id="monthDropdown"></select>
+        <select id="yearDropdown" style="display: none;"></select>
+    </div>
+
+    <div id="entryFields">
+        <div class="input-item"><label>Take-Home Salary</label><input type="number" class="salary-field" placeholder="0"></div>
+        <div class="input-item"><label>Rent / Home Loan EMI</label><input type="number" class="expense-field" placeholder="0"></div>
+        <div class="input-item"><label>Insurance Policies</label><input type="number" class="expense-field" placeholder="0"></div>
+        <div class="input-item"><label>Electricity & Water</label><input type="number" class="expense-field" placeholder="0"></div>
+        <div class="input-item"><label>Internet & Mobile</label><input type="number" class="expense-field" placeholder="0"></div>
+        <div class="input-item"><label>Groceries & Milk</label><input type="number" class="expense-field" placeholder="0"></div>
+        <div class="input-item"><label>House Help / Salary</label><input type="number" class="expense-field" placeholder="0"></div>
+        <div class="input-item"><label>Dining & Online Food</label><input type="number" class="expense-field" placeholder="0"></div>
+        <div class="input-item"><label>Fuel & Commute</label><input type="number" class="expense-field" placeholder="0"></div>
+        <div class="input-item"><label>OTT & Entertainment</label><input type="number" class="expense-field" placeholder="0"></div>
+        <div class="input-item"><label>Medical & Healthcare</label><input type="number" class="expense-field" placeholder="0"></div>
+        <div class="input-item"><label>Miscellaneous</label><input type="number" class="expense-field" placeholder="0"></div>
+        
+        <button id="mainBtn" onclick="processCalculation()">Calculate & Save</button>
+    </div>
+
+    <div id="resultArea" class="result-pane">
+        <div id="resTitle" style="font-weight: bold; color: #666; letter-spacing: 1px; font-size: 0.8rem;">SURPLUS AMOUNT</div>
+        <div class="res-val" id="totalBalance">₹0</div>
+        <div id="resNote" style="margin-top: 10px; font-size: 0.9em; color: #4a5568;"></div>
+    </div>
+
+    <div style="margin-top: 40px;">
+        <h3>History</h3>
+        <table id="historyTable">
+            <thead>
+                <tr>
+                    <th>Period</th>
+                    <th>Income</th>
+                    <th>Expense</th>
+                    <th>Balance</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="historyBody"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    function init() {
+        const mDrop = document.getElementById('monthDropdown');
+        months.forEach(m => { mDrop.innerHTML += `<option value="${m}">${m}</option>`; });
+        const yDrop = document.getElementById('yearDropdown');
+        const curYear = new Date().getFullYear();
+        for (let i = curYear; i >= curYear - 20; i--) { yDrop.innerHTML += `<option value="${i}">${i}</option>`; }
+        renderHistory();
+    }
+
+    function toggleMode() {
+        const mode = document.getElementById('calcMode').value;
+        const mDrop = document.getElementById('monthDropdown');
+        const yDrop = document.getElementById('yearDropdown');
+        const btn = document.getElementById('mainBtn');
+
+        if (mode === 'monthly') {
+            mDrop.style.display = 'block';
+            yDrop.style.display = 'none';
+            btn.innerText = "Calculate & Save Month";
+        } else {
+            mDrop.style.display = 'none';
+            yDrop.style.display = 'block';
+            btn.innerText = "Calculate & Save Yearly Projection";
+        }
+        document.getElementById('resultArea').style.display = 'none';
+    }
+
+    function processCalculation() {
+        const mode = document.getElementById('calcMode').value;
+        const multiplier = (mode === 'monthly') ? 1 : 12;
+        
+        let monthlySalary = 0;
+        document.querySelectorAll('.salary-field').forEach(el => monthlySalary += (parseFloat(el.value) || 0));
+        
+        let monthlyExpense = 0;
+        document.querySelectorAll('.expense-field').forEach(el => monthlyExpense += (parseFloat(el.value) || 0));
+
+        // Multiply by 12 if Yearly Projection is selected
+        const finalIncome = monthlySalary * multiplier;
+        const finalExpense = monthlyExpense * multiplier;
+        const finalBalance = finalIncome - finalExpense;
+
+        const label = (mode === 'monthly') ? 
+            document.getElementById('monthDropdown').value + " " + new Date().getFullYear() : 
+            "Year " + document.getElementById('yearDropdown').value;
+
+        const record = {
+            type: (mode === 'monthly') ? 'Monthly' : 'Yearly',
+            label: label,
+            income: finalIncome,
+            expense: finalExpense,
+            balance: finalBalance
+        };
+
+        saveToHistory(record);
+        showResult(finalIncome, finalExpense, finalBalance, label, mode);
+    }
+
+    function saveToHistory(record) {
+        let history = JSON.parse(localStorage.getItem('projectionFinHistory') || '[]');
+        history.push(record);
+        localStorage.setItem('projectionFinHistory', JSON.stringify(history));
+        renderHistory();
+    }
+
+    function showResult(i, e, b, label, mode) {
+        const fmt = (v) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(v);
+        document.getElementById('totalBalance').innerText = fmt(b);
+        document.getElementById('resNote').innerHTML = `<strong>${mode.toUpperCase()} VIEW:</strong> ${label}<br>Income: ${fmt(i)} | Expense: ${fmt(e)}`;
+        document.getElementById('resultArea').style.display = 'block';
+    }
+
+    function renderHistory() {
+        const history = JSON.parse(localStorage.getItem('projectionFinHistory') || '[]');
+        const body = document.getElementById('historyBody');
+        const fmt = (v) => v.toLocaleString('en-IN');
+        body.innerHTML = history.map((h, i) => `
+            <tr>
+                <td><span class="tag ${h.type === 'Monthly' ? 'tag-month' : 'tag-year'}">${h.type}</span> ${h.label}</td>
+                <td>₹${fmt(h.income)}</td>
+                <td>₹${fmt(h.expense)}</td>
+                <td style="font-weight:bold; color:${h.balance >= 0 ? 'green' : 'red'}">₹${fmt(h.balance)}</td>
+                <td><button class="del-btn" onclick="deleteHist(${i})">X</button></td>
+            </tr>`).reverse().join('');
+    }
+
+    function deleteHist(i) {
+        let history = JSON.parse(localStorage.getItem('projectionFinHistory'));
+        const actualIndex = history.length - 1 - i;
+        history.splice(actualIndex, 1);
+        localStorage.setItem('projectionFinHistory', JSON.stringify(history));
+        renderHistory();
+    }
+
+    window.onload = init;
+</script>
+</body>
+</html>
